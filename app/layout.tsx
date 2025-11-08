@@ -1,0 +1,49 @@
+import "./globals.css";
+import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
+import NavBar from "./components/nav/NavBar";
+import Footer from "./components/footer/Footer";
+import CartProvider from "@/providers/CartProvider";
+import { Toaster } from "react-hot-toast";
+import getCurrentUser from "@/actions/getCurrentUser";
+
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "700"] });
+
+export const metadata: Metadata = {
+  title: "Thesis Archive Management System",
+  description: "Digital repository for thesis documents from the Computer Studies Department",
+};
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const currentUser = await getCurrentUser();
+
+  return (
+    <html lang="en">
+      <body className={`${poppins.className} text-slate-700`}>
+        <Toaster
+          toastOptions={{
+            style: {
+              background: "rgb(51 65 85)",
+              color: "#fff",
+            },
+          }}
+        />
+        <CartProvider>
+          <div className="flex flex-col min-h-screen">
+            {/* Only show NavBar when user is NOT logged in */}
+            {!currentUser && <NavBar />}
+            
+            <main className="flex-grow">{children}</main>
+            
+            {/* Only show Footer when user is NOT logged in */}
+            {!currentUser && <Footer />}
+          </div>
+        </CartProvider>
+      </body>
+    </html>
+  );
+}
