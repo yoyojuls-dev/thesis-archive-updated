@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -40,6 +43,10 @@ model User {
   accounts      Account[]
   orders        Order[]
   reviews       Review[]
+  uploadedThesis Thesis[] @relation("UploadedBy")
+  favorites     Favorite[]
+  downloads     Download[]
+  thesisRatings ThesisRating[]
 }
 
 model Product{
@@ -81,6 +88,133 @@ model Order{
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// ===== THESIS MANAGEMENT MODELS =====
+
+model Thesis {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  title String
+  abstract String
+  fullContent String? // Optional - for future use when content is needed
+  
+  // Author Information
+  authorName String // Can contain multiple authors separated by commas
+  authorEmail String?
+  studentId String?
+  
+  // Academic Information
+  advisorName String
+  coAdvisorName String?
+  committeeMembers String[] // Array of committee member names
+  department String
+  program String // e.g., "Master of Science in Computer Science"
+  university String @default("State University")
+  degreeLevel DegreeLevel
+  
+  // Thesis Details
+  categoryId String @db.ObjectId
+  keywords String[] // Array of keywords
+  language String @default("English")
+  
+  // Content Structure
+  references String[] // Array of references/bibliography
+  acknowledgments String?
+  
+  // Dates
+  submissionDate DateTime
+  approvalDate DateTime?
+  defenseDate DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Status and Approval
+  status ThesisStatus @default(PENDING)
+  approvedBy String? @db.ObjectId // Admin who approved
+  rejectionReason String?
+  
+  // Statistics
+  downloadCount Int @default(0) // For text export
+  viewCount Int @default(0)
+  averageRating Float @default(0)
+  totalRatings Int @default(0)
+  
+  // Metadata
+  citation String? // Auto-generated citation
+  digitalLibraryId String? // Unique identifier for digital library
+  
+  // Relations
+  category Category @relation(fields: [categoryId], references: [id])
+  uploadedBy User @relation("UploadedBy", fields: [uploadedByUserId], references: [id])
+  uploadedByUserId String @db.ObjectId
+  
+  favorites Favorite[]
+  downloads Download[]
+  ratings ThesisRating[]
+  
+  @@index([categoryId])
+  @@index([status])
+  @@index([submissionDate])
+  @@index([authorName])
+  @@index([title])
+}
+
+// New model for thesis chapters
+model Category {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  name String @unique // e.g., "Computer Science"
+  description String?
+  code String @unique // e.g., "CS", "IT", "IS"
+  color String @default("#ef4444") // For UI theming
+  isActive Boolean @default(true)
+  createdAt DateTime @default(now())
+  
+  thesis Thesis[]
+}
+
+model Favorite {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  thesisId String @db.ObjectId
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thesis Thesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, thesisId])
+}
+
+model Download {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  thesisId String @db.ObjectId
+  downloadedAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thesis Thesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  
+  @@index([thesisId])
+  @@index([userId])
+  @@index([downloadedAt])
+}
+
+model ThesisRating {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @db.ObjectId
+  thesisId String @db.ObjectId
+  rating Int // 1-5 stars
+  comment String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thesis Thesis @relation(fields: [thesisId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, thesisId])
+}
+
+// ===== EXISTING TYPES =====
+
 type CartProductType{
   id String
   name String
@@ -107,7 +241,24 @@ type Address{
   state String
 } 
 
+// ===== ENUMS =====
+
 enum Role{
     USER
     ADMIN
+}
+
+enum ThesisStatus {
+  PENDING      // Waiting for admin approval
+  APPROVED     // Approved and published
+  REJECTED     // Rejected by admin
+  DRAFT        // Draft state (not submitted)
+  ARCHIVED     // Archived thesis
+}
+
+enum DegreeLevel {
+  BACHELOR     // Bachelor's degree
+  MASTER       // Master's degree  
+  DOCTORATE    // PhD/Doctoral degree
+  DIPLOMA      // Diploma programs
 }
